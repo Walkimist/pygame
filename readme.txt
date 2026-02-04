@@ -3,7 +3,7 @@ Sprite assets - Mostly taken from https://kenney.nl/assets and edited+made a cou
 Sound assets - Taken from https://mixkit.co/free-sound-effects/ + applied some pitching, cutting, tempo and volume modifications
 Music - Leave The World Tonight (Chiptune) by Kim Lightyear
 
-##Python version used: 3.13.2
+Python version used: 3.13.2
 Libraries used: Pygame Zero, math, random
 
 Installing and running instructions:
