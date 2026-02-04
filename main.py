@@ -31,11 +31,11 @@ CAT_ANIMATION_FRAMES = animation_frames_dict("enemy3")
 
 # very arbitrary values I gathered from brief testing, probably not balanced
 WAVE_PROPERTIES = {
-    1: {"amount": 10, "upgrade": 5, "delay": 1},
-    2: {"amount": 20, "upgrade": 50, "delay": 1},
-    3: {"amount": 30, "upgrade": 10, "delay": 0.5},
-    4: {"amount": 30, "upgrade": 50, "delay": 1},
-    5: {"amount": 50, "upgrade": 80, "delay": 1},
+    1: {"amount": 15, "upgrade": 5, "delay": 1.2},
+    2: {"amount": 20, "upgrade": 30, "delay": 0.9},
+    3: {"amount": 30, "upgrade": 10, "delay": 0.6},
+    4: {"amount": 30, "upgrade": 50, "delay": 0.7},
+    5: {"amount": 60, "upgrade": 80, "delay": 0.6},
 }
 
 
@@ -72,8 +72,8 @@ ENEMY_TYPES = {
 }
 
 UPGRADE_PROPERTIES = {
-    "damage": {"common": 0.5, "rare": 1, "epic": 2},
-    "firerate": {"common": -0.1, "rare": -0.2, "epic": -0.4},
+    "damage": {"common": 0.5, "rare": 1.5, "epic": 3},
+    "firerate": {"common": -0.15, "rare": -0.2, "epic": -0.3},
     "shot_speed": {"common": 0.2, "rare": 0.5, "epic": 0.8},
     "max_health": {"common": 1, "rare": 2, "epic": 3},
     "move_speed": {"common": 0.5, "rare": 1, "epic": 1.5},
@@ -191,7 +191,7 @@ class Player(Entity):
         self.invulnerability_time = 0.5
         self.can_shoot = True
 
-        self.firerate = 0.8
+        self.firerate = 0.6
         self.shot_speed = 7
         self.damage = 1
         self.move_speed = move_speed
@@ -221,7 +221,8 @@ class Player(Entity):
 
     def get_mouse_direction(self):
         radians_to_mouse = math.atan2(
-            game_manager.mouse_pos[1] - self.y, game_manager.mouse_pos[0] - self.x
+            game_manager.mouse_pos[1] -
+            self.y, game_manager.mouse_pos[0] - self.x
         )
 
         x_direction = math.cos(radians_to_mouse)
@@ -230,7 +231,8 @@ class Player(Entity):
 
     def activate_invulnerability(self):
         self.is_invulnerable = True
-        clock.schedule(self.deactivate_invulnerability, self.invulnerability_time)
+        clock.schedule(self.deactivate_invulnerability,
+                       self.invulnerability_time)
 
     def deactivate_invulnerability(self):
         self.is_invulnerable = False
@@ -311,10 +313,14 @@ class Upgrade(Actor):
     def upgrade_stat(self, player):
         current_value = getattr(player, self.type)
         upgrade_value = UPGRADE_PROPERTIES[self.type][self.rarity]
-        setattr(player, self.type, current_value + upgrade_value)
+        if self.type == "firerate" and current_value + upgrade_value < 0.1:
+            setattr(player, self.type, current_value + upgrade_value)
+        else:
+            setattr(player, self.type, current_value + upgrade_value)
         # print(self.type, upgrade_value)
         if self.type == "max_health":
-            player.change_current_health(UPGRADE_PROPERTIES[self.type][self.rarity])
+            player.change_current_health(
+                UPGRADE_PROPERTIES[self.type][self.rarity])
 
     def generate_upgrade_type(self, block_list):
         upgrade_types = list(UPGRADE_PROPERTIES.keys())
@@ -324,7 +330,8 @@ class Upgrade(Actor):
         return upgrade_types[type_roll]
 
     def generate_upgrade_rarity(self):
-        rarity = "common"  # we will roll two 'dice', each with a chance to upgrade the rarity for randomness
+        # we will roll two 'dice', each with a chance to upgrade the rarity for randomness
+        rarity = "common"
         rarity_roll = [random.randint(1, 100), random.randint(1, 100)]
         if rarity_roll[0] <= 40:
             rarity = "rare"
@@ -340,7 +347,8 @@ class WaveManager:
         self.spawns_remaining = WAVE_PROPERTIES[self.current_wave]["amount"]
 
         self.wave_text = Actor("wave_text", ((WIDTH / 2), -50))
-        self.wave_number = Actor(f"{self.current_wave}", ((WIDTH / 2 + 34), -50))
+        self.wave_number = Actor(
+            f"{self.current_wave}", ((WIDTH / 2 + 34), -50))
 
     def start_wave(self):
         self.wave_number.image = f"{self.current_wave}"
@@ -413,7 +421,8 @@ class WaveManager:
         self.upgrades = []
         upgrade_types = []
         for i in range(0, 3):
-            upgrade = Upgrade((OFFSET * i + OFFSET / 2, HEIGHT / 2), upgrade_types)
+            upgrade = Upgrade(
+                (OFFSET * i + OFFSET / 2, HEIGHT / 2), upgrade_types)
             upgrade_types.append(upgrade.type)
             self.upgrades.append(upgrade)
 
@@ -431,13 +440,15 @@ def get_background_image():
     roll = random.randint(1, 4)
     return f"background_{roll}"
 
-
 # Trying to stop the global spam, also way better for resetting the game
+
+
 class GameManager:
     def __init__(self):
         self.reset()
 
     def reset(self):
+        music.stop()
         self.mouse_pos = [WIDTH / 2, HEIGHT / 2]
         self.background = None
         self.wave_manager = None
@@ -493,7 +504,8 @@ def start_game():
     game_manager.wave_manager.start_wave()
 
     if game_manager.muted == False:
-        music.play("kim-lightyear-leave-the-world-tonight-chiptune-edit-loop-132102")
+        music.play(
+            "kim-lightyear-leave-the-world-tonight-chiptune-edit-loop-132102")
         music.set_volume(0.02)
 
 
@@ -506,6 +518,8 @@ def on_mouse_down(pos):
             if game_manager.wave_manager.intermission:
                 for upgrade in game_manager.wave_manager.upgrades:
                     if upgrade.collidepoint(pos):
+                        if game_manager.muted == False:
+                            getattr(sounds, "get_upgrade").play()
                         upgrade.upgrade_stat(game_manager.player)
                         game_manager.wave_manager.upgrades = []
                         game_manager.wave_manager.start_wave()
@@ -513,7 +527,7 @@ def on_mouse_down(pos):
             for i, button in enumerate(game_manager.buttons):
                 if button.collidepoint(pos):
                     if game_manager.muted == False:
-                        getattr(sounds, "shoot3").play()
+                        getattr(sounds, "ui_click").play()
                     if i == 0:
                         start_game()
                     elif i == 1:
@@ -528,10 +542,8 @@ def on_mouse_move(pos, rel, buttons):
 
 
 def on_key_down(key):
-    print(f"{key} pressed")
-    if key == 114 and game_manager.game_started:
+    if key == 114 and game_manager.game_started:  # 114 = R key
         restart_game()
-        start_game()
 
 
 def draw():
@@ -562,7 +574,8 @@ def draw():
                     f"{upgrade.type}_{upgrade.rarity}",
                     (upgrade.x - 135, upgrade.y - 60),
                 )
-                screen.blit(f"{upgrade.rarity}", (upgrade.x - 130, upgrade.y + 30))
+                screen.blit(f"{upgrade.rarity}",
+                            (upgrade.x - 130, upgrade.y + 30))
     else:
         screen.blit("logo", (WIDTH / 2 - 144, HEIGHT / 2 - 300))
         for button in game_manager.buttons:
