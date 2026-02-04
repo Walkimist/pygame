@@ -143,7 +143,7 @@ class Entity(Actor):
         self.current_health += amount
         if amount < 0:
             self.is_hurt = True
-            if muted == False:
+            if game_manager.muted == False:
                 getattr(sounds, self.hurt_sound).play()
             clock.schedule(self.set_character_normal, 0.2)
 
@@ -176,7 +176,7 @@ class Projectile(Entity):
 
     def play_sound(self):
         sound_id = random.randint(1, 3)
-        if muted == False:
+        if game_manager.muted == False:
             getattr(sounds, f"shoot{sound_id}").play()
 
 
@@ -199,7 +199,11 @@ class Player(Entity):
 
     def update_shooting(self):
         global projectiles
-        if self.can_shoot and wave_manager.intermission == False and game_over == False:
+        if (
+            self.can_shoot
+            and game_manager.wave_manager.intermission == False
+            and game_manager.game_over == False
+        ):
             projectile = Projectile(
                 "player_projectile",
                 self.pos,
@@ -208,7 +212,7 @@ class Player(Entity):
                 self.get_mouse_direction(),
                 self.damage,
             )
-            projectiles.append(projectile)
+            game_manager.projectiles.append(projectile)
             projectile.play_sound()
             self.can_shoot = False
             clock.schedule(self.reload, self.firerate)
@@ -217,7 +221,9 @@ class Player(Entity):
         self.can_shoot = True
 
     def get_mouse_direction(self):
-        radians_to_mouse = math.atan2(mouse_pos[1] - self.y, mouse_pos[0] - self.x)
+        radians_to_mouse = math.atan2(
+            game_manager.mouse_pos[1] - self.y, game_manager.mouse_pos[0] - self.x
+        )
 
         x_direction = math.cos(radians_to_mouse)
         y_direction = math.sin(radians_to_mouse)
@@ -287,8 +293,7 @@ class Enemy(Entity):
         self.direction = [x_direction, y_direction]
 
     def remove_self(self):
-        global enemies
-        enemies.remove(self)
+        game_manager.enemies.remove(self)
 
 
 class Upgrade(Actor):
@@ -304,7 +309,7 @@ class Upgrade(Actor):
         current_value = getattr(player, self.type)
         upgrade_value = UPGRADE_PROPERTIES[self.type][self.rarity]
         setattr(player, self.type, current_value + upgrade_value)
-        print(self.type, upgrade_value)
+        # print(self.type, upgrade_value)
         if self.type == "max_health":
             player.change_current_health(UPGRADE_PROPERTIES[self.type][self.rarity])
 
@@ -374,8 +379,7 @@ class WaveManager:
             enemy_data["damage"],
             "enemy_hurt",
         )
-        global enemies
-        enemies.append(enemy)
+        game_manager.enemies.append(enemy)
         self.spawns_remaining -= 1
         if self.spawns_remaining > 0 and self.intermission == False:
             clock.schedule(
@@ -388,13 +392,13 @@ class WaveManager:
         if self.current_wave == 5:
             # end game
             return
-        if len(enemies) > 0:
+        if len(game_manager.enemies) > 0:
             clock.schedule(self.wait_for_wave_end, 1)
             return
         self.end_wave()
 
     def end_wave(self):
-        if muted == False:
+        if game_manager.muted == False:
             getattr(sounds, "wave_pass").play()
         self.intermission = True
         self.current_wave += 1
@@ -411,7 +415,7 @@ class WaveManager:
             self.upgrades.append(upgrade)
 
     def get_enemy_type(self):
-        # we will roll two 'dice', each with a chance to further upgrade the enemy for difficulty and randomness
+        # again we roll two dice for enemy type, adding randomness and difficulty
         roll = [random.randint(1, 100), random.randint(1, 100)]
         if roll[0] <= WAVE_PROPERTIES[self.current_wave]["upgrade"]:
             if roll[1] <= WAVE_PROPERTIES[self.current_wave]["upgrade"]:
@@ -425,39 +429,52 @@ def get_background_image():
     return f"background_{roll}"
 
 
-mouse_pos = [0, 0]
-background = None
-player = None
-wave_manager = None
-projectiles = []
-enemies = []
-game_started = False
-muted = False
-buttons = []
-game_over = False
+# Trying to lessen the global spam
+class GameManager:
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.mouse_pos = [0, 0]
+        self.background = None
+        self.player = None
+        self.wave_manager = None
+        self.projectiles = []
+        self.enemies = []
+        self.game_started = False
+        self.muted = False
+        self.buttons = []
+        self.game_over = False
+
+
+game_manager = GameManager()
+
+
+def restart_game():
+    game_manager.reset()
+    main_menu()
 
 
 def main_menu():
     OFFSET = 60
-    global buttons, background
 
-    background = "background_0"
+    game_manager.background = "background_0"
 
     play_game_button = Actor("play", (WIDTH / 2, HEIGHT / 2))
-    mute_game_button = Actor(f"mute_{int(muted)}", (WIDTH / 2, HEIGHT / 2 + OFFSET))
+    mute_game_button = Actor(
+        f"mute_{int(game_manager.muted)}", (WIDTH / 2, HEIGHT / 2 + OFFSET)
+    )
     exit_game_button = Actor("exit", (WIDTH / 2, HEIGHT / 2 + 2 * OFFSET))
 
-    buttons.append(play_game_button)
-    buttons.append(mute_game_button)
-    buttons.append(exit_game_button)
+    game_manager.buttons.append(play_game_button)
+    game_manager.buttons.append(mute_game_button)
+    game_manager.buttons.append(exit_game_button)
 
 
 def start_game():
-    global player, wave_manager, background
+    game_manager.background = get_background_image()
 
-    background = get_background_image()
-
-    player = Player(
+    game_manager.player = Player(
         "player_idle_1r",
         (WIDTH / 2, HEIGHT / 2),
         5,
@@ -467,10 +484,10 @@ def start_game():
         "player_hurt",
     )
 
-    wave_manager = WaveManager()
-    wave_manager.start_wave()
+    game_manager.wave_manager = WaveManager()
+    game_manager.wave_manager.start_wave()
 
-    if muted == False:
+    if game_manager.muted == False:
         music.play("kim-lightyear-leave-the-world-tonight-chiptune-edit-loop-132102")
         music.set_volume(0.02)
 
@@ -479,46 +496,44 @@ main_menu()
 
 
 def on_mouse_down(pos):
-    global game_started
-    if game_started:
-        for upgrade in wave_manager.upgrades:
-            if upgrade.collidepoint(pos):
-                upgrade.upgrade_stat(player)
-                wave_manager.start_wave()
+    if game_manager.game_started:
+        for upgrade in game_manager.wave_manager.upgrades:
+            if upgrade.collidepoint(pos) and game_manager.wave_manager.intermission:
+                upgrade.upgrade_stat(game_manager.player)
+                game_manager.wave_manager.upgrades = []
+                game_manager.wave_manager.start_wave()
     else:
-        for i, button in enumerate(buttons):
+        for i, button in enumerate(game_manager.buttons):
             if button.collidepoint(pos):
-                global muted
-                if muted == False:
+                if game_manager.muted == False:
                     getattr(sounds, "shoot3").play()
                 if i == 0:
-                    game_started = True
+                    game_manager.game_started = True
                     start_game()
                 elif i == 1:
-                    muted = not muted
-                    button.image = f"mute_{int(muted)}"
+                    game_manager.muted = not game_manager.muted
+                    button.image = f"mute_{int(game_manager.muted)}"
                 else:
                     exit()
 
 
 def on_mouse_move(pos, rel, buttons):
-    global mouse_pos
-    mouse_pos = pos
+    game_manager.mouse_pos = pos
 
 
 def draw():
     screen.clear()
-    screen.blit(background, (0, 0))
-    if game_started:
-        for enemy in enemies:
+    screen.blit(game_manager.background, (0, 0))
+    if game_manager.game_started:
+        for enemy in game_manager.enemies:
             enemy.draw()
-        for projectile in projectiles:
+        for projectile in game_manager.projectiles:
             projectile.draw()
-        player.draw()
-        wave_manager.wave_text.draw()
-        wave_manager.wave_number.draw()
-        if wave_manager.intermission == True:
-            for upgrade in wave_manager.upgrades:
+        game_manager.player.draw()
+        game_manager.wave_manager.wave_text.draw()
+        game_manager.wave_manager.wave_number.draw()
+        if game_manager.wave_manager.intermission == True:
+            for upgrade in game_manager.wave_manager.upgrades:
                 screen.blit("choose_an_upgrade", (WIDTH / 2 - 103, 160))
                 upgrade.draw()
                 screen.blit(
@@ -528,25 +543,24 @@ def draw():
                 screen.blit(f"{upgrade.rarity}", (upgrade.x - 130, upgrade.y + 30))
     else:
         screen.blit("logo", (WIDTH / 2 - 144, HEIGHT / 2 - 300))
-        for button in buttons:
+        for button in game_manager.buttons:
             button.draw()
 
 
 def update():
-    if game_started:
-        player.update_animation()
-        if player.current_health > 0:
-            player.update_pressed_direction()
-            player.move()
-            player.update_shooting()
-        for enemy in enemies:
-            # enemy.check_if_left_screen(enemies)
+    if game_manager.game_started:
+        game_manager.player.update_animation()
+        if game_manager.player.current_health > 0:
+            game_manager.player.update_pressed_direction()
+            game_manager.player.move()
+            game_manager.player.update_shooting()
+        for enemy in game_manager.enemies:
             if enemy.current_health > 0:
-                enemy.update_player_direction(player)
+                enemy.update_player_direction(game_manager.player)
                 enemy.move()
-                enemy.check_projectile_collisions(projectiles)
-                enemy.check_player_collision(player)
+                enemy.check_projectile_collisions(game_manager.projectiles)
+                enemy.check_player_collision(game_manager.player)
             enemy.update_animation()
-        for projectile in projectiles:
-            projectile.check_if_left_screen(projectiles)
+        for projectile in game_manager.projectiles:
+            projectile.check_if_left_screen(game_manager.projectiles)
             projectile.move()
