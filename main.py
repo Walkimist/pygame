@@ -130,7 +130,8 @@ class Entity(Actor):
         self.current_health += amount
         if amount < 0:
             self.is_hurt = True
-            getattr(sounds, self.hurt_sound).play()
+            if muted == False:
+                getattr(sounds, self.hurt_sound).play()
             clock.schedule(self.set_character_normal, 0.2)
 
     def set_character_normal(self):
@@ -162,7 +163,8 @@ class Projectile(Entity):
 
     def play_sound(self):
         sound_id = random.randint(1, 3)
-        getattr(sounds, f"shoot{sound_id}").play()
+        if muted == False:
+            getattr(sounds, f"shoot{sound_id}").play()
 
 
 class Player(Entity):
@@ -339,7 +341,8 @@ class WaveManager:
         self.end_wave()
 
     def end_wave(self):
-        getattr(sounds, "wave_pass").play()
+        if muted == False:
+            getattr(sounds, "wave_pass").play()
         self.intermission = True
         self.current_wave += 1
         self.spawns_remaining = WAVE_PROPERTIES[self.current_wave]["amount"]
@@ -360,16 +363,37 @@ def get_background_image():
 
 
 mouse_pos = [0, 0]
-background = get_background_image()
+background = None
 player = None
 wave_manager = None
 projectiles = []
 enemies = []
+game_started = False
+muted = False
+buttons = []
+
+
+def main_menu():
+    OFFSET = 60
+    global buttons, background
+
+    background = "background_0"
+
+    play_game_button = Actor("play", (WIDTH / 2, HEIGHT / 2))
+    mute_game_button = Actor(f"mute_{int(muted)}", (WIDTH / 2, HEIGHT / 2 + OFFSET))
+    exit_game_button = Actor("exit", (WIDTH / 2, HEIGHT / 2 + 2 * OFFSET))
+
+    buttons.append(play_game_button)
+    buttons.append(mute_game_button)
+    buttons.append(exit_game_button)
 
 
 def start_game():
-    global player
-    global wave_manager
+    global player, wave_manager, background
+    # global wave_manager
+    # global background
+
+    background = get_background_image()
 
     player = Player(
         "player_idle_1r",
@@ -384,8 +408,29 @@ def start_game():
     wave_manager = WaveManager()
     wave_manager.start_wave()
 
-    music.play("kim-lightyear-leave-the-world-tonight-chiptune-edit-loop-132102")
-    music.set_volume(0.02)
+    if muted == False:
+        music.play("kim-lightyear-leave-the-world-tonight-chiptune-edit-loop-132102")
+        music.set_volume(0.02)
+
+
+main_menu()
+
+
+def on_mouse_down(pos):
+    for i, button in enumerate(buttons):
+        if button.collidepoint(pos):
+            global muted
+            if muted == False:
+                getattr(sounds, "shoot3").play()
+            if i == 0:  # play
+                global game_started
+                game_started = True
+                start_game()
+            elif i == 1:  # mute/unmute
+                muted = not muted
+                button.image = f"mute_{int(muted)}"
+            else:
+                exit()
 
 
 def on_mouse_move(pos, rel, buttons):
@@ -396,29 +441,35 @@ def on_mouse_move(pos, rel, buttons):
 def draw():
     screen.clear()
     screen.blit(background, (0, 0))
-    for enemy in enemies:
-        enemy.draw()
-    for projectile in projectiles:
-        projectile.draw()
-    player.draw()
-    wave_manager.wave_text.draw()
-    wave_manager.wave_number.draw()
+    if game_started:
+        for enemy in enemies:
+            enemy.draw()
+        for projectile in projectiles:
+            projectile.draw()
+        player.draw()
+        wave_manager.wave_text.draw()
+        wave_manager.wave_number.draw()
+    else:
+        screen.blit("logo", (WIDTH / 2 - 144, HEIGHT / 2 - 300))
+        for button in buttons:
+            button.draw()
 
 
 def update():
-    player.update_animation()
-    if player.current_health > 0:
-        player.update_pressed_direction()
-        player.move()
-        player.update_shooting()
-    for enemy in enemies:
-        # enemy.check_if_left_screen(enemies)
-        if enemy.current_health > 0:
-            enemy.update_player_direction(player)
-            enemy.move()
-            enemy.check_projectile_collisions(projectiles)
-            enemy.check_player_collision(player)
-        enemy.update_animation()
-    for projectile in projectiles:
-        projectile.check_if_left_screen(projectiles)
-        projectile.move()
+    if game_started:
+        player.update_animation()
+        if player.current_health > 0:
+            player.update_pressed_direction()
+            player.move()
+            player.update_shooting()
+        for enemy in enemies:
+            # enemy.check_if_left_screen(enemies)
+            if enemy.current_health > 0:
+                enemy.update_player_direction(player)
+                enemy.move()
+                enemy.check_projectile_collisions(projectiles)
+                enemy.check_player_collision(player)
+            enemy.update_animation()
+        for projectile in projectiles:
+            projectile.check_if_left_screen(projectiles)
+            projectile.move()
