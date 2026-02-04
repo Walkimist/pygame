@@ -11,8 +11,11 @@ Python version used: 3.13.2
 Libraries used: Pygame Zero, math, random
 
 Installing and running instructions:
-1- Open a cmd/powershell terminal
-2- Make sure you have the latest/matching python version installed, to check you can run "python --version"
-2- Install Pygame Zero: Run "pip install pgzero" in the terminal
-3- Have the installed folder's directory correct path selected in the terminal "cd <path_to_directory>"
-4- Run the game using the command "pgzrun main.py", the game may take a few seconds upon first running
+1- Install Git from https://git-scm.com
+2- Open Command Prompt or PowerShell
+3- Ensure Python 3.x is installed by running: python --version
+4- Install Pygame Zero: pip install pgzero
+5- Navigate to the directory where you want the project installed: cd <path_to_directory>
+6- Clone the repository: git clone https://github.com/Walkimist/pygame.git
+7- Navigate into the cloned project folder: cd pygame
+8- Run the game: pgzrun main.py
