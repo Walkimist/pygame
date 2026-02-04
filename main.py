@@ -206,7 +206,7 @@ class Enemy(Entity):
 
 class WaveManager():
     def __init__(self):
-        self.currentWave = 5
+        self.currentWave = 1
         self.intermission = False
         self.spawnsRemaining = WAVE_PROPERTIES[self.currentWave]['amount']
 
