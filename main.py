@@ -2,7 +2,7 @@ import math
 import random
 
 # I know I went a little overboard on the line count and game complexity, but I do hope it doesn't detract from my overall score
-# as a limit wasn't stated in the requirements, I was just having a lot of fun making this x)
+# as a limit wasn't stated in the requirements. I was just having a lot of fun making this x)
 
 ANIMATION_INTERVAL = 6
 
@@ -31,18 +31,18 @@ CAT_ANIMATION_FRAMES = animation_frames_dict("enemy3")
 
 # very arbitrary values I gathered from brief testing, probably not balanced
 WAVE_PROPERTIES = {
-    1: {"amount": 1, "upgrade": 5, "delay": 2},
-    2: {"amount": 20, "upgrade": 50, "delay": 2},
-    3: {"amount": 30, "upgrade": 10, "delay": 1},
-    4: {"amount": 30, "upgrade": 50, "delay": 2},
-    5: {"amount": 50, "upgrade": 50, "delay": 1},
+    1: {"amount": 10, "upgrade": 5, "delay": 1},
+    2: {"amount": 20, "upgrade": 50, "delay": 1},
+    3: {"amount": 30, "upgrade": 10, "delay": 0.5},
+    4: {"amount": 30, "upgrade": 50, "delay": 1},
+    5: {"amount": 50, "upgrade": 80, "delay": 1},
 }
 
 
 HITBOXES = {"small": 12, "medium": 15, "big": 20}
-SPEED = {"slow": 1, "medium": 2, "fast": 3}
+SPEED = {"slow": 2.5, "medium": 4, "fast": 4.5}
 HEALTH = {"frail": 1, "normal": 2, "tough": 3}
-DAMAGE = {"weak": 1, "strong": 2}
+DAMAGE = {"weak": 2, "strong": 3}
 
 ENEMY_TYPES = {
     "caterpillar": {
@@ -198,7 +198,6 @@ class Player(Entity):
         self.max_health = max_health
 
     def update_shooting(self):
-        global projectiles
         if (
             self.can_shoot
             and game_manager.wave_manager.intermission == False
@@ -235,6 +234,10 @@ class Player(Entity):
 
     def deactivate_invulnerability(self):
         self.is_invulnerable = False
+
+    def check_if_dead(self):
+        if self.current_health <= 0:
+            game_manager.game_over = True
 
     def update_pressed_direction(self):
         self.direction = [0, 0]
@@ -389,9 +392,6 @@ class WaveManager:
             self.wait_for_wave_end()
 
     def wait_for_wave_end(self):
-        if self.current_wave == 5:
-            # end game
-            return
         if len(game_manager.enemies) > 0:
             clock.schedule(self.wait_for_wave_end, 1)
             return
@@ -400,6 +400,9 @@ class WaveManager:
     def end_wave(self):
         if game_manager.muted == False:
             getattr(sounds, "wave_pass").play()
+        if self.current_wave == 5:
+            game_manager.game_over = True
+            return
         self.intermission = True
         self.current_wave += 1
         self.spawns_remaining = WAVE_PROPERTIES[self.current_wave]["amount"]
@@ -429,7 +432,7 @@ def get_background_image():
     return f"background_{roll}"
 
 
-# Trying to lessen the global spam
+# Trying to stop the global spam, also way better for resetting the game
 class GameManager:
     def __init__(self):
         self.reset()
@@ -437,7 +440,6 @@ class GameManager:
     def reset(self):
         self.mouse_pos = [0, 0]
         self.background = None
-        self.player = None
         self.wave_manager = None
         self.projectiles = []
         self.enemies = []
@@ -445,6 +447,8 @@ class GameManager:
         self.muted = False
         self.buttons = []
         self.game_over = False
+        self.player = None
+        self.restart_scheduled = False
 
 
 game_manager = GameManager()
@@ -496,25 +500,27 @@ main_menu()
 
 
 def on_mouse_down(pos):
-    if game_manager.game_started:
-        for upgrade in game_manager.wave_manager.upgrades:
-            if upgrade.collidepoint(pos) and game_manager.wave_manager.intermission:
-                upgrade.upgrade_stat(game_manager.player)
-                game_manager.wave_manager.upgrades = []
-                game_manager.wave_manager.start_wave()
-    else:
-        for i, button in enumerate(game_manager.buttons):
-            if button.collidepoint(pos):
-                if game_manager.muted == False:
-                    getattr(sounds, "shoot3").play()
-                if i == 0:
-                    game_manager.game_started = True
-                    start_game()
-                elif i == 1:
-                    game_manager.muted = not game_manager.muted
-                    button.image = f"mute_{int(game_manager.muted)}"
-                else:
-                    exit()
+    if game_manager.game_over == False:
+        if game_manager.game_started:
+            if game_manager.wave_manager.intermission:
+                for upgrade in game_manager.wave_manager.upgrades:
+                    if upgrade.collidepoint(pos):
+                        upgrade.upgrade_stat(game_manager.player)
+                        game_manager.wave_manager.upgrades = []
+                        game_manager.wave_manager.start_wave()
+        else:
+            for i, button in enumerate(game_manager.buttons):
+                if button.collidepoint(pos):
+                    if game_manager.muted == False:
+                        getattr(sounds, "shoot3").play()
+                    if i == 0:
+                        game_manager.game_started = True
+                        start_game()
+                    elif i == 1:
+                        game_manager.muted = not game_manager.muted
+                        button.image = f"mute_{int(game_manager.muted)}"
+                    else:
+                        exit()
 
 
 def on_mouse_move(pos, rel, buttons):
@@ -532,6 +538,15 @@ def draw():
         game_manager.player.draw()
         game_manager.wave_manager.wave_text.draw()
         game_manager.wave_manager.wave_number.draw()
+        if game_manager.game_over:
+            screen.blit("game_over", (WIDTH / 2 - 157, 250))
+            if game_manager.player.current_health > 0:
+                screen.blit("victory", (WIDTH / 2 - 82, 300))
+            else:
+                screen.blit("defeat", (WIDTH / 2 - 74, 300))
+            if game_manager.restart_scheduled == False:
+                clock.schedule(restart_game, 3)
+                game_manager.restart_scheduled = True
         if game_manager.wave_manager.intermission == True:
             for upgrade in game_manager.wave_manager.upgrades:
                 screen.blit("choose_an_upgrade", (WIDTH / 2 - 103, 160))
@@ -550,6 +565,7 @@ def draw():
 def update():
     if game_manager.game_started:
         game_manager.player.update_animation()
+        game_manager.player.check_if_dead()
         if game_manager.player.current_health > 0:
             game_manager.player.update_pressed_direction()
             game_manager.player.move()
