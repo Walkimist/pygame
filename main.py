@@ -41,7 +41,7 @@ WAVE_PROPERTIES = {
 
 HITBOXES = {"small": 12, "medium": 15, "big": 20}
 SPEED = {"slow": 2.5, "medium": 4, "fast": 4.5}
-HEALTH = {"frail": 1, "normal": 2, "tough": 3}
+HEALTH = {"frail": 1, "normal": 2, "tough": 4}
 DAMAGE = {"weak": 2, "strong": 3}
 
 ENEMY_TYPES = {
@@ -438,7 +438,7 @@ class GameManager:
         self.reset()
 
     def reset(self):
-        self.mouse_pos = [0, 0]
+        self.mouse_pos = [WIDTH / 2, HEIGHT / 2]
         self.background = None
         self.wave_manager = None
         self.projectiles = []
@@ -476,6 +476,7 @@ def main_menu():
 
 
 def start_game():
+    game_manager.game_started = True
     game_manager.background = get_background_image()
 
     game_manager.player = Player(
@@ -514,7 +515,6 @@ def on_mouse_down(pos):
                     if game_manager.muted == False:
                         getattr(sounds, "shoot3").play()
                     if i == 0:
-                        game_manager.game_started = True
                         start_game()
                     elif i == 1:
                         game_manager.muted = not game_manager.muted
@@ -525,6 +525,13 @@ def on_mouse_down(pos):
 
 def on_mouse_move(pos, rel, buttons):
     game_manager.mouse_pos = pos
+
+
+def on_key_down(key):
+    print(f"{key} pressed")
+    if key == 114 and game_manager.game_started:
+        restart_game()
+        start_game()
 
 
 def draw():
